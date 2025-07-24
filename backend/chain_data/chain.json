@@ -1,0 +1,10 @@
+[
+  {
+    "index": 0,
+    "timestamp": 1753308348,
+    "transactions": [],
+    "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "nonce": 0,
+    "hash": "1b07311718af7ace725aa43443fefafc11ce7f3c3b979fb43ceda63f67fa6690"
+  }
+]

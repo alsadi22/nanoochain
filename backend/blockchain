@@ -1,0 +1,112 @@
+import hashlib
+import json
+import os
+import time
+from typing import List, Dict, Any
+
+CHAIN_FILE = "chain.json"
+MEMPOOL_FILE = "mempool.json"
+DIFFICULTY = 4
+BLOCK_REWARD = 50
+
+class Blockchain:
+    def __init__(self):
+        self.chain: List[Dict[str, Any]] = self.load_chain() or [self.create_genesis_block()]
+        self.mempool: List[Dict[str, Any]] = self.load_mempool() or []
+
+    def create_genesis_block(self):
+        genesis_block = {
+            "index": 0,
+            "timestamp": time.time(),
+            "transactions": [],
+            "previous_hash": "0",
+            "nonce": 0,
+        }
+        genesis_block["hash"] = self.hash_block(genesis_block)
+        self.save_chain([genesis_block])
+        return genesis_block
+
+    def load_chain(self):
+        if not os.path.exists(CHAIN_FILE):
+            return None
+        with open(CHAIN_FILE, "r") as f:
+            return json.load(f)
+
+    def save_chain(self, chain=None):
+        if chain is None:
+            chain = self.chain
+        with open(CHAIN_FILE, "w") as f:
+            json.dump(chain, f, indent=4)
+
+    def load_mempool(self):
+        if not os.path.exists(MEMPOOL_FILE):
+            return []
+        with open(MEMPOOL_FILE, "r") as f:
+            return json.load(f)
+
+    def save_mempool(self):
+        with open(MEMPOOL_FILE, "w") as f:
+            json.dump(self.mempool, f, indent=4)
+
+    def hash_block(self, block):
+        block_copy = block.copy()
+        block_copy.pop("hash", None)
+        block_string = json.dumps(block_copy, sort_keys=True).encode()
+        return hashlib.sha256(block_string).hexdigest()
+
+    def add_block(self, block: Dict[str, Any]) -> bool:
+        if self.is_valid_new_block(block, self.chain[-1]):
+            self.chain.append(block)
+            self.save_chain()
+            self.mempool = [tx for tx in self.mempool if tx not in block["transactions"]]
+            self.save_mempool()
+            return True
+        return False
+
+    def is_valid_new_block(self, new_block, previous_block):
+        if previous_block["hash"] != new_block["previous_hash"]:
+            return False
+        if not self.hash_block(new_block).startswith("0" * DIFFICULTY):
+            return False
+        if new_block["index"] != previous_block["index"] + 1:
+            return False
+        if self.hash_block(new_block) != new_block.get("hash"):
+            return False
+        return True
+
+    def is_valid_chain(self, chain):
+        for i in range(1, len(chain)):
+            if not self.is_valid_new_block(chain[i], chain[i - 1]):
+                return False
+        return True
+
+    def replace_chain(self, new_chain: List[Dict[str, Any]]) -> bool:
+        if self.is_valid_chain(new_chain) and len(new_chain) > len(self.chain):
+            self.chain = new_chain
+            self.save_chain()
+            return True
+        return False
+
+    def get_last_block(self):
+        return self.chain[-1]
+
+    def add_transaction_to_mempool(self, transaction: Dict[str, Any]):
+        self.mempool.append(transaction)
+        self.save_mempool()
+
+    def get_balance(self, address: str) -> float:
+        balance = 0.0
+        for block in self.chain:
+            for tx in block["transactions"]:
+                if tx["sender"] == address:
+                    balance -= tx["amount"]
+                if tx["recipient"] == address:
+                    balance += tx["amount"]
+        return balance
+
+    def validate_transaction(self, transaction: Dict[str, Any]) -> bool:
+        sender = transaction["sender"]
+        amount = transaction["amount"]
+        if sender == "MINING":
+            return True
+        return self.get_balance(sender) >= amount

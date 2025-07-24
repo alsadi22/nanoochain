@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+chain_data/
+blocks/
+wallet_data/
+genesis.dat
+wallet.json
+block1.dat
